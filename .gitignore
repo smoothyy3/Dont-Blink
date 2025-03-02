@@ -9,6 +9,8 @@ dataset/
 
 # Distribution / packaging
 .DS_Store
+Dont-Blink-Database-1/
+import_data.ipynb
 .vscode/
 .Python
 build/
