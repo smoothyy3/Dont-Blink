@@ -13,6 +13,7 @@ Printhead-Position-Detection-1/
 Dont-Blink-Database-1/
 runs/
 yolov8n.pt
+yolo11n.pt
 import_data.ipynb
 .vscode/
 .Python
