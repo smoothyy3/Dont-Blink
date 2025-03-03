@@ -12,7 +12,7 @@ This project aims to create an **AI-powered timelapse system for 3D printers**, 
 
 ## First Prototype - Initial Results  
 
-### ** Training Data Samples**  
+### **Training Data Samples**  
 We trained the model using captured images of different printhead positions.  
 #### **Example Training Batch**  
 This is how the training data looks:  
