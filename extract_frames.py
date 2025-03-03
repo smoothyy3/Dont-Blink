@@ -1,8 +1,8 @@
 import cv2
 import os
 
-video_path = "/Users/jonas/Desktop/private-git/Dont-Blink/dataset/raw_vid/28.02.25/28.02.25.mp4"
-output_folder = "/Users/jonas/Desktop/private-git/Dont-Blink/dataset/raw_img/28.02.25"
+video_path = "/Users/jonas/Desktop/private-git/Dont-Blink/dataset/raw_vid/02.03.25/02.03.25.MP4"
+output_folder = "/Users/jonas/Desktop/private-git/Dont-Blink/dataset/raw_img/02.03.25"
 
 os.makedirs(output_folder, exist_ok=True)
 
