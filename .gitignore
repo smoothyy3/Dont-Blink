@@ -11,6 +11,7 @@ dataset/
 .DS_Store
 Printhead-Position-Detection-1/
 Dont-Blink-Database-1/
+Dataframe_left/
 runs/
 yolov8n.pt
 yolo11n.pt
