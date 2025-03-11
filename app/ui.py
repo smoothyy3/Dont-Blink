@@ -1,13 +1,16 @@
-from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, 
-                             QComboBox, QMessageBox, QFileDialog)
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
+                             QComboBox, QMessageBox, QFileDialog, QCheckBox)
+from PyQt5.QtGui import QImage, QPixmap, QIcon
 from PyQt5.QtCore import QTimer, QThread, pyqtSignal
+
 import cv2
 import sys
 import os
 import math
+import datetime
 from ultralytics import YOLO
 from natsort import natsorted
+
 
 
 def list_cameras():
@@ -97,51 +100,227 @@ class CameraApp(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Camera Selection & Timelapse Processing")
-        self.setGeometry(100, 100, 600, 400)
-        
+        self.setGeometry(100, 100, 640, 480)
+
+
+        self.setWindowIcon(QIcon("icon.png"))
+        # Setzt das QSS für das gesamte Fenster
+        self.setStyleSheet("""
+        QWidget {
+            background-color: #ffffff;
+            font-family: "Segoe UI", sans-serif;
+            color: #333;
+            border-radius: 10px;
+        }
+
+        QLabel {
+            font-size: 14px;
+            font-weight: bold;
+            color: #444;
+        }
+
+        QComboBox {
+            background-color: #ffffff;
+            border: 1px solid #d1d1d1;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        QComboBox::drop-down {
+            border-radius: 5px;
+        }
+
+        QPushButton {
+            background-color: #4CAF50;
+            color: white;
+            border: 1px solid #4CAF50;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        QPushButton:hover {
+            background-color: #45a049;
+        }
+
+        QPushButton:pressed {
+            background-color: #388e3c;
+        }
+
+        QPushButton:disabled {
+            background-color: #dcdcdc;
+            color: #a5a5a5;
+        }
+
+        QCheckBox {
+            font-size: 14px;
+            padding: 5px 10px;
+            color: #444;
+        }
+
+        QCheckBox::indicator {
+            width: 15px;
+            height: 15px;
+        }
+
+        QCheckBox::indicator:checked {
+            background-color: #4CAF50;
+            border-radius: 5px;
+        }
+
+        QCheckBox::indicator:unchecked {
+            background-color: #dcdcdc;
+            border-radius: 5px;
+        }
+
+        QLineEdit {
+            background-color: #ffffff;
+            border: 1px solid #d1d1d1;
+            padding: 5px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        QLabel#camera_preview_label {
+            background-color: #222222;
+            border-radius: 5px;
+        }
+
+        QScrollArea {
+            background-color: #f5f5f5;
+            border-radius: 10px;
+            border: 1px solid #d1d1d1;
+        }
+
+        QScrollBar {
+            width: 10px;
+            background-color: #f5f5f5;
+        }
+
+        QScrollBar::handle {
+            background-color: #cccccc;
+            border-radius: 5px;
+        }
+
+        QScrollBar::handle:hover {
+            background-color: #aaaaaa;
+        }
+
+        QScrollBar::add-line, QScrollBar::sub-line {
+            background-color: #f5f5f5;
+        }
+
+        QScrollBar::up-arrow, QScrollBar::down-arrow {
+            background-color: #f5f5f5;
+        }
+        """) 
         self.layout = QVBoxLayout()
-        
+
         self.label = QLabel("Select Camera:")
         self.layout.addWidget(self.label)
-        
+
+        # Erstelle ein horizontales Layout für ComboBox und Button
+        camera_layout = QHBoxLayout()
+
         self.camera_selection = QComboBox()
         self.available_cameras = list_cameras()
         if not self.available_cameras:
             self.available_cameras.append("No cameras found")
         self.camera_selection.addItems(self.available_cameras)
-        self.layout.addWidget(self.camera_selection)
-        
+        camera_layout.addWidget(self.camera_selection)
+
         self.select_button = QPushButton("Confirm Camera")
         self.select_button.clicked.connect(self.select_camera)
-        self.layout.addWidget(self.select_button)
-        
+        camera_layout.addWidget(self.select_button)
+
+        # Container für Kamera-Auswahl
+        camera_container = QWidget()
+        camera_container.setLayout(camera_layout)
+        camera_container.setMaximumWidth(325)
+        self.layout.addWidget(camera_container)
+
+        # Erstelle ein horizontales Layout für Preview und Checkbox
+        preview_layout = QHBoxLayout()
+
         self.camera_preview_label = QLabel("Camera preview here")
         self.camera_preview_label.setFixedSize(320, 240)
-        self.layout.addWidget(self.camera_preview_label)
-        
-        self.select_folder_button = QPushButton("Select Output Folder")
-        self.select_folder_button.clicked.connect(self.select_output_folder)
-        self.layout.addWidget(self.select_folder_button)
-        
-        self.start_button = QPushButton("Start YOLO Processing")
+        preview_layout.addWidget(self.camera_preview_label)
+
+        self.check_detection = QCheckBox("Preview detection")
+        preview_layout.addWidget(self.check_detection)
+
+        # Container für Preview + Checkbox
+        preview_container = QWidget()
+        preview_container.setLayout(preview_layout)
+        preview_container.setMaximumWidth(600)  # Kann angepasst werden
+        self.layout.addWidget(preview_container)
+
+        # Erstelle ein horizontales Layout für Start und Stop Button
+        button_layout = QHBoxLayout()
+
+        self.start_button = QPushButton("Start Processing")
         self.start_button.clicked.connect(self.start_processing)
-        self.layout.addWidget(self.start_button)
-        
+        button_layout.addWidget(self.start_button)
+
         self.stop_button = QPushButton("Stop Processing")
         self.stop_button.clicked.connect(self.stop_processing)
         self.stop_button.setEnabled(False)
-        self.layout.addWidget(self.stop_button)
+        button_layout.addWidget(self.stop_button)
+
+        # Container für Start + Stop Button
+        button_container = QWidget()
+        button_container.setLayout(button_layout)
+        button_container.setMaximumWidth(525)  # Kann angepasst werden
+        self.layout.addWidget(button_container)
+
+        # Container für Output Folder Button
+        output_layout = QHBoxLayout()
+        self.select_folder_button = QPushButton("Select Output Folder")
+        self.select_folder_button.clicked.connect(self.select_output_folder)
+        output_layout.addWidget(self.select_folder_button)
         
+        self.output_folder_label = QLabel("Current Output Folder:")
+        output_layout.addWidget(self.output_folder_label)
+
+        output_container = QWidget()
+        output_container.setLayout(output_layout)
+        output_container.setMaximumWidth(600)  # Kann angepasst werden
+        self.layout.addWidget(output_container)
+
+        # Container für Timelapse Button
+        timelapse_layout = QHBoxLayout()
         self.timelapse_button = QPushButton("Create Timelapse")
         self.timelapse_button.clicked.connect(self.create_timelapse)
-        self.layout.addWidget(self.timelapse_button)
-        
+        timelapse_layout.addWidget(self.timelapse_button)
+
+        self.status_label = QLabel("Status:")
+        timelapse_layout.addWidget(self.status_label)
+
+        timelapse_container = QWidget()
+        timelapse_container.setLayout(timelapse_layout)
+        timelapse_container.setMaximumWidth(400)  # Kann angepasst werden
+        self.layout.addWidget(timelapse_container)
+
+
         self.setLayout(self.layout)
         self.cap = None
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_preview)
         self.output_folder = ""
+        self.current_session_folder = ""
         self.processing_thread = None
+        self.model = YOLO(os.path.join(os.path.dirname(os.path.abspath(__file__)), "weights", "best.pt"))
+
+        
+        self.camera_selection.setFixedWidth(50)
+        self.select_button.setFixedWidth(250)
+        self.select_folder_button.setFixedWidth(250)
+        self.start_button.setFixedWidth(250)
+        self.stop_button.setFixedWidth(250)
+        self.timelapse_button.setFixedWidth(250)
+        
     
     def select_camera(self):
         if self.cap is not None:
@@ -165,6 +344,17 @@ class CameraApp(QWidget):
         if self.cap is not None and self.cap.isOpened():
             ret, frame = self.cap.read()
             if ret:
+                if self.check_detection.isChecked():
+                    results = self.model(frame, conf=0.5)
+                    for r in results:
+                        for box in r.boxes:
+                            x, y, w, h = box.xywh[0].tolist()
+                            x_min, y_min = int(x - w / 2), int(y - h / 2)
+                            x_max, y_max = int(x + w / 2), int(y + h / 2)
+                            cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+                            cv2.putText(frame, f"Conf: {box.conf[0]:.2f}", (x_min, y_min - 10),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 h, w, ch = frame_rgb.shape
                 bytes_per_line = ch * w
@@ -172,7 +362,7 @@ class CameraApp(QWidget):
                 pixmap = QPixmap.fromImage(qimg).scaled(320, 240)
                 self.camera_preview_label.setPixmap(pixmap)
         else:
-            self.timer.stop()
+            self.timer.stop()        
     
     def select_output_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Output Folder")
@@ -180,15 +370,20 @@ class CameraApp(QWidget):
             self.output_folder = folder
     
     def start_processing(self):
-        if not self.output_folder or self.cap is None or not self.cap.isOpened():
-            QMessageBox.warning(self, "Warning", "Select camera and output folder before processing.")
+        if not self.output_folder:
+            QMessageBox.warning(self, "No Output Folder", "Please select an output folder before starting processing.")
             return
         
-        self.processing_thread = YOLOProcessingThread(self.cap, self.output_folder)
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.current_session_folder = os.path.join(self.output_folder, f"session_{timestamp}")
+        os.makedirs(self.current_session_folder, exist_ok=True)
+        self.processing_thread = YOLOProcessingThread(self.cap, self.current_session_folder)
         self.processing_thread.finished_signal.connect(self.processing_finished)
         self.processing_thread.start()
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
+        
+        QMessageBox.information(self, "Processing Started", f"Images will be saved in: {self.current_session_folder}")
     
     def stop_processing(self):
         if self.processing_thread:
@@ -196,16 +391,52 @@ class CameraApp(QWidget):
         self.processing_finished()
     
     def processing_finished(self):
-        QMessageBox.information(self, "Processing Done", "Timelapse Processing finished! Images saved in output folder.")
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
     
     def create_timelapse(self):
-        # (Timelapse creation logic remains unchanged)
-        pass
+        if not self.current_session_folder:
+            QMessageBox.warning(self, "No Session Folder", "No session folder found. Start YOLO processing first.")
+            return
+
+        frames_path = self.current_session_folder
+        video_path = os.path.join(frames_path, "timelapse.mp4")
+        FPS = 15
+
+        images = [img for img in os.listdir(frames_path) if img.endswith(".jpg")]
+        images = natsorted(images)
+
+        if not images:
+            QMessageBox.warning(self, "No Images", "No images found in the session folder to create a timelapse.")
+            return
+
+        first_frame = cv2.imread(os.path.join(frames_path, images[0]))
+        if first_frame is None:
+            QMessageBox.warning(self, "Error", "Could not read the first image.")
+            return
+
+        h, w,  = first_frame.shape
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        out = cv2.VideoWriter(video_path, fourcc, FPS, (w, h))
+
+        for image in images:
+            frame = cv2.imread(os.path.join(frames_path, image))
+            if frame is None:
+                print(f"Warning: Skipping unreadable image {image}")
+                continue
+            out.write(frame)
+
+        out.release()
+        QMessageBox.information(self, "Timelapse Created", f"Timelapse video saved at: {video_path}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon("icon.png"))
+    
     window = CameraApp()
     window.show()
     sys.exit(app.exec_())
+
+
+
+
