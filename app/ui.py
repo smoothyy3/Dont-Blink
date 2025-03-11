@@ -62,10 +62,6 @@ class YOLOProcessingThread(QThread):
                 hImg, wImg, _ = frame.shape
 
             if frame_count % frame_skip == 0:
-                results = model.predict(frame, device = "cuda")
-                frame_skip = fSkip
-            
-            if frame_count % frame_skip == 0:
                 results = model.predict(frame, device="cuda")
                 frame_skip = fSkip
                 
@@ -383,7 +379,8 @@ class CameraApp(QWidget):
         self.processing_thread.start()
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
-        
+        self.check_detection.setChecked(False)
+        self.check_detection.setEnabled(False)
         QMessageBox.information(self, "Processing Started", f"Images will be saved in: {self.current_session_folder}")
     
     def stop_processing(self):
@@ -394,6 +391,7 @@ class CameraApp(QWidget):
     def processing_finished(self):
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
+        self.check_detection.setEnabled(True)
     
     def create_timelapse(self):
         if not self.current_session_folder:
