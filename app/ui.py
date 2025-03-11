@@ -62,7 +62,7 @@ class YOLOProcessingThread(QThread):
                 hImg, wImg, _ = frame.shape
 
             if frame_count % frame_skip == 0:
-                results = model.predict(frame, device="cuda")
+                results = model.predict(frame, device="cpu")
                 frame_skip = fSkip
                 
                 for r in results:
@@ -239,9 +239,10 @@ class CameraApp(QWidget):
 
         # Erstelle ein horizontales Layout für Preview und Checkbox
         preview_layout = QHBoxLayout()
-
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        video_path = os.path.join(BASE_DIR,"Video.png")
         self.camera_preview_label = QLabel(self)
-        self.camera_preview_label.setPixmap(QPixmap("Video.png"))
+        self.camera_preview_label.setPixmap(QPixmap(video_path))
         self.camera_preview_label.setFixedSize(426, 240)
         preview_layout.addWidget(self.camera_preview_label)
 
