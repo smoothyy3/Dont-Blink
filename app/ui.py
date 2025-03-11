@@ -99,7 +99,6 @@ class CameraApp(QWidget):
         self.setGeometry(100, 100, 640, 480)
 
 
-        self.setWindowIcon(QIcon("icon.png"))
         # Setzt das QSS für das gesamte Fenster
         self.setStyleSheet("""
         QWidget {
@@ -431,7 +430,10 @@ class CameraApp(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    app.setWindowIcon(QIcon("icon.png"))
+    
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    icon_path = os.path.join(BASE_DIR,"icon.png")
+    app.setWindowIcon(QIcon(icon_path))
     
     window = CameraApp()
     window.show()
