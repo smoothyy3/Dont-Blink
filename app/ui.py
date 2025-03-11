@@ -99,7 +99,7 @@ class YOLOProcessingThread(QThread):
 class CameraApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Camera Selection & Timelapse Processing")
+        self.setWindowTitle("Dont-Blink")
         self.setGeometry(100, 100, 640, 480)
 
 
@@ -244,8 +244,9 @@ class CameraApp(QWidget):
         # Erstelle ein horizontales Layout für Preview und Checkbox
         preview_layout = QHBoxLayout()
 
-        self.camera_preview_label = QLabel("Camera preview here")
-        self.camera_preview_label.setFixedSize(320, 240)
+        self.camera_preview_label = QLabel(self)
+        self.camera_preview_label.setPixmap(QPixmap("Video.png"))
+        self.camera_preview_label.setFixedSize(426, 240)
         preview_layout.addWidget(self.camera_preview_label)
 
         self.check_detection = QCheckBox("Preview detection")
@@ -359,7 +360,7 @@ class CameraApp(QWidget):
                 h, w, ch = frame_rgb.shape
                 bytes_per_line = ch * w
                 qimg = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
-                pixmap = QPixmap.fromImage(qimg).scaled(320, 240)
+                pixmap = QPixmap.fromImage(qimg).scaled(426, 240)
                 self.camera_preview_label.setPixmap(pixmap)
         else:
             self.timer.stop()        
