@@ -4,7 +4,11 @@
 This project aims to create an **AI-powered timelapse system for 3D printers**, where the camera automatically takes a picture **only when the printhead is out of the frame**. The goal is to generate clean timelapse videos without the printhead obstructing the view.  
 
 ### **Demo Video**  
-[![AI Printhead Tracking - Timelapse Demo](https://img.youtube.com/vi/nMrHcGVqUqU/0.jpg)](https://youtu.be/nMrHcGVqUqU)  
+<p align="center">
+  <a href="https://youtu.be/nMrHcGVqUqU">
+    <img src="https://img.youtube.com/vi/nMrHcGVqUqU/maxresdefault.jpg" width="700">
+  </a>
+</p>
 
 ---
 
@@ -21,17 +25,17 @@ This project aims to create an **AI-powered timelapse system for 3D printers**, 
 We trained the model using captured images of different printhead positions.  
 
 #### **Example Training Batch**  
-<img src="assets/img/train_batch0.jpg" width="450">  
+<img src="assets/img/train_batch0.jpg" width="550">  
 
 #### **Labeled Validation Batch**  
-<img src="assets/img/val_batch0_labels.jpg" width="450">  
+<img src="assets/img/val_batch0_labels.jpg" width="550">  
 
 ---
 
 ### **Results of the First Prototype**  
 After training, the model's first results show promising detection accuracy. Here’s an overview of detections in sample frames:  
 
-<img src="assets/img/results.png" width="450">  
+<img src="assets/img/results.png" width="550">  
 
 - The system **accurately avoids taking pictures when the printhead is in the frame**.  
 - Works in **real-time**, ensuring smooth operation alongside the 3D printer’s layer movements.  
