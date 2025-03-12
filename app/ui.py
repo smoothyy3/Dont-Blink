@@ -1,17 +1,76 @@
-from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-                             QComboBox, QMessageBox, QFileDialog, QCheckBox)
+from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QComboBox, QMessageBox, QFileDialog, QCheckBox)
 from PyQt5.QtGui import QImage, QPixmap, QIcon
 from PyQt5.QtCore import QTimer, QThread, pyqtSignal
-
 import cv2
 import sys
 import os
 import math
 import datetime
 from ultralytics import YOLO
+import requests
+import shutil
+import subprocess
+import time
 from natsort import natsorted
 
+def check_for_updates(self):
+    latest_version_url = "https://smoothyy3.github.io/Dont-Blink/latest_version.txt"  # Change to your GitHub Pages URL
+    current_version_path = os.path.join(os.path.dirname(__file__), "version.txt")
+    
+    try:
+        # Read the current version
+        with open(current_version_path, "r") as f:
+            current_version = f.read().strip()
+        
+        # Fetch the latest version info
+        response = requests.get(latest_version_url)
+        response.raise_for_status()
+        
+        latest_version_info = response.text.split("\n")
+        latest_version = latest_version_info[0].strip()
+        download_url = latest_version_info[1].strip()  # GitHub Releases link
 
+        if latest_version > current_version:
+            reply = QMessageBox.question(self, "Update Available", 
+                                         f"A new version ({latest_version}) is available. Do you want to update?",
+                                         QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.download_and_replace(download_url, latest_version)
+        else:
+            QMessageBox.information(self, "No Updates", "You have the latest version.")
+    
+    except Exception as e:
+        QMessageBox.critical(self, "Error", f"Failed to check for updates: {e}")
+
+def download_and_replace(self, url, latest_version):
+    """Downloads the new version and replaces the running executable."""
+    
+    # Path to the current running executable
+    current_exe = sys.executable
+    temp_exe = os.path.join(os.path.dirname(current_exe), "Dont-Blink-Temp.exe")
+
+    try:
+        # Download the new exe
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(temp_exe, 'wb') as f:
+                shutil.copyfileobj(r.raw, f)
+
+        # Show update message
+        QMessageBox.information(self, "Updating", "The app will now restart with the updated version.")
+
+        # Launch the updater script and close the app
+        subprocess.Popen(["python", "-c", f"""
+        import time, os, shutil, sys
+        time.sleep(2)  # Wait for the app to fully close
+        shutil.move("{temp_exe.replace("\\", "\\\\")}", "{current_exe.replace("\\", "\\\\")}")
+        os.startfile("{current_exe.replace("\\", "\\\\")}")
+        """], shell=True)
+
+        sys.exit(0)  # Exit the current app
+        
+    except Exception as e:
+        QMessageBox.critical(self, "Update Failed", f"Could not download update: {e}")
 
 def list_cameras():
     index = 0
@@ -438,7 +497,3 @@ if __name__ == "__main__":
     window = CameraApp()
     window.show()
     sys.exit(app.exec_())
-
-
-
-
