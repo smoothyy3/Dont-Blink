@@ -12,8 +12,10 @@ dataset/
 Printhead-Position-Detection-1/
 Dont-Blink-Database-1/
 Dataframe_left/
+app/installer.iss
 runs/
 yolov8n.pt
+app/dontblink_env
 yolo11n.pt
 import_data.ipynb
 .vscode/

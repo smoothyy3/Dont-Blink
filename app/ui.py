@@ -415,7 +415,7 @@ class CameraApp(QWidget):
             QMessageBox.warning(self, "Error", "Could not read the first image.")
             return
 
-        h, w,  = first_frame.shape
+        h, w, _  = first_frame.shape
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         out = cv2.VideoWriter(video_path, fourcc, FPS, (w, h))
 
