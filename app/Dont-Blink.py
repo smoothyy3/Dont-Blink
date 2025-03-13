@@ -95,7 +95,18 @@ class YOLOProcessingThread(QThread):
 class CameraApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Dont-Blink")
+        
+         # Get the directory of the current executable/script
+        base_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
+        version_path = os.path.join(base_dir, "version.txt")
+
+        # Read the version from the file, fallback to "Unknown"
+        version = "Unknown"
+        if os.path.exists(version_path):
+            with open(version_path, "r") as f:
+                version = f.read().strip()
+
+        self.setWindowTitle(f"Dont-Blink v{version}")  # Set window title with version
         self.setGeometry(100, 100, 640, 480)
 
 
