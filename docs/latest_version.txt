@@ -1,2 +1,2 @@
-0.10
-https://github.com/smoothyy3/Dont-Blink/releases/download/0.10/Dont-Blink.exe
+0.11
+https://github.com/smoothyy3/Dont-Blink/releases/download/0.11/Dont-Blink.exe

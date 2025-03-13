@@ -98,7 +98,7 @@ class CameraApp(QWidget):
         super().__init__()
 
         self.setWindowTitle("Dont-Blink")  # Set window title with version
-        self.setGeometry(100, 100, 640, 480)
+        self.setFixedSize(624, 600)  # Set window to 640x480 and disable resizing
 
 
         # Setzt das QSS für das gesamte Fenster
@@ -364,7 +364,7 @@ class CameraApp(QWidget):
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to check for updates: {e}")
-            
+
     def download_and_replace(self, url, latest_version):
         """Downloads the new version and replaces the running executable safely."""
         
