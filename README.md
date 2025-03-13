@@ -27,8 +27,8 @@ This project aims to create an **AI-powered timelapse system for 3D printers**, 
 
 ### **2. Choose Input Source**  
 You can select one of the following options:  
-- **Live Camera**: Use a connected webcam or Raspberry Pi camera to track the printhead in real-time.  
-- **Video File**: Process an existing video file and extract timelapse frames.  
+- **Live Camera**: Use a connected webcam to track the printhead in real-time.  
+- **Video File**: Process an existing video file (.mp4) and extract timelapse frames.  
 
 ### **3. Configure Output Folder**  
 - Select a folder where the images will be stored.  
