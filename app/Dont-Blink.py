@@ -297,7 +297,7 @@ class CameraApp(QWidget):
 
         timelapse_container = QWidget()
         timelapse_container.setLayout(timelapse_layout)
-        timelapse_container.setMaximumWidth(400)  # Kann angepasst werden
+        timelapse_container.setMaximumWidth(600)  # Kann angepasst werden
         self.layout.addWidget(timelapse_container)
 
         # updater buttons
