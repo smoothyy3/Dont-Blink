@@ -97,7 +97,21 @@ class CameraApp(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Dont-Blink")  # Set window title with version
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS  # PyInstaller temp extraction folder
+        else:
+            base_path = os.path.dirname(__file__)  # Running from source
+
+        current_version_path = os.path.join(base_path, "version.txt")
+
+        if not os.path.exists(current_version_path):
+            current_version = "Unknown"
+        else:
+            with open(current_version_path, "r") as f:
+                current_version = f.read().strip()
+
+        # Set window title with version
+        self.setWindowTitle(f"Dont-Blink v{current_version}")
         self.setFixedSize(624, 600)  # Set window to 640x480 and disable resizing
 
 
