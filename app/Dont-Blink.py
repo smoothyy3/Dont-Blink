@@ -278,7 +278,7 @@ class CameraApp(QWidget):
         self.select_folder_button.clicked.connect(self.select_output_folder)
         output_layout.addWidget(self.select_folder_button)
         
-        self.output_folder_label = QLabel("Current Output Folder:")
+        self.output_folder_label = QLabel("Output Folder:")
         output_layout.addWidget(self.output_folder_label)
 
         output_container = QWidget()
@@ -439,6 +439,7 @@ class CameraApp(QWidget):
         folder = QFileDialog.getExistingDirectory(self, "Select Output Folder")
         if folder:
             self.output_folder = folder
+            self.output_folder_label.setText(f"Output Folder: {self.output_folder}")
     
     def start_processing(self):
         if not self.output_folder:
@@ -455,7 +456,6 @@ class CameraApp(QWidget):
         self.stop_button.setEnabled(True)
         self.check_detection.setChecked(False)
         self.check_detection.setEnabled(False)
-        QMessageBox.information(self, "Processing Started", f"Images will be saved in: {self.current_session_folder}")
     
     def stop_processing(self):
         if self.processing_thread:
@@ -500,7 +500,7 @@ class CameraApp(QWidget):
             out.write(frame)
 
         out.release()
-        QMessageBox.information(self, "Timelapse Created", f"Timelapse video saved at: {video_path}")
+        self.status_label.setText(f"Status: Video saved at {video_path}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
