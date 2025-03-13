@@ -233,7 +233,7 @@ class CameraApp(QWidget):
         # Container für Kamera-Auswahl
         camera_container = QWidget()
         camera_container.setLayout(camera_layout)
-        camera_container.setMaximumWidth(325)
+        camera_container.setMaximumWidth(800)
         self.layout.addWidget(camera_container)
 
         # Erstelle ein horizontales Layout für Preview und Checkbox
@@ -303,7 +303,7 @@ class CameraApp(QWidget):
         # updater buttons
         self.update_button = QPushButton("Check for Updates")
         self.update_button.clicked.connect(self.check_for_updates)
-        self.layout.addWidget(self.update_button)
+        camera_layout.addWidget(self.update_button)
 
         self.setLayout(self.layout)
         self.cap = None
@@ -324,22 +324,27 @@ class CameraApp(QWidget):
 
     def check_for_updates(self):
         latest_version_url = "https://smoothyy3.github.io/Dont-Blink/latest_version.txt"  # Your GitHub Pages URL
-        current_version_path = os.path.join(os.path.dirname(__file__), "version.txt")
+
+        # Determine if running from a bundled PyInstaller EXE
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS  # PyInstaller temp extraction folder
+        else:
+            base_path = os.path.dirname(__file__)  # Running from source
+
+        current_version_path = os.path.join(base_path, "version.txt")
 
         try:
-            # Ensure version.txt exists, otherwise set current version to "0.0.0"
+            # Read the current version (If it doesn’t exist, default to "0.0")
             if not os.path.exists(current_version_path):
-                with open(current_version_path, "w") as f:
-                    f.write("0.0.0")  # Default version if missing
-
-            # Read the current version
-            with open(current_version_path, "r") as f:
-                current_version = f.read().strip()
+                current_version = "0.0"
+            else:
+                with open(current_version_path, "r") as f:
+                    current_version = f.read().strip()
 
             # Fetch the latest version info
             response = requests.get(latest_version_url)
             response.raise_for_status()
-            
+
             latest_version_info = response.text.split("\n")
             latest_version = latest_version_info[0].strip()
             download_url = latest_version_info[1].strip()  # URL of new .exe
@@ -359,10 +364,11 @@ class CameraApp(QWidget):
     def download_and_replace(self, url, latest_version):
         """Downloads the new version and replaces the running executable."""
         
-        # Path to the current running executable
+        # Paths
         current_exe = sys.executable
         temp_exe = os.path.join(os.path.dirname(current_exe), "Dont-Blink-Temp.exe")
         backup_exe = os.path.join(os.path.dirname(current_exe), "Dont-Blink-Old.exe")
+        version_file = os.path.join(os.path.dirname(current_exe), "version.txt")
 
         try:
             QMessageBox.information(self, "Updating", "Downloading the new version...")
@@ -375,23 +381,25 @@ class CameraApp(QWidget):
 
             QMessageBox.information(self, "Update Ready", "Update downloaded! Restarting...")
 
-            # Create an update script and restart the application safely
+            # Create an update script that replaces the exe and updates version.txt
             update_script = os.path.join(os.path.dirname(current_exe), "update_script.bat")
             with open(update_script, "w") as f:
                 f.write(f"""@echo off
                 timeout /t 3 /nobreak > NUL
                 move /Y "{current_exe}" "{backup_exe}"
                 move /Y "{temp_exe}" "{current_exe}"
+                echo {latest_version} > "{version_file}"
                 start "" "{current_exe}"
                 del "%~f0"
                 """)
 
-            # Run the update script and exit the app
+            # Run the update script and exit
             subprocess.Popen(update_script, shell=True)
             sys.exit(0)
 
         except Exception as e:
             QMessageBox.critical(self, "Update Failed", f"Could not download update: {e}")
+
     
     def select_camera(self):
         if self.cap is not None:
