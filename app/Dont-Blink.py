@@ -233,7 +233,7 @@ class CameraApp(QWidget):
         # Container für Kamera-Auswahl
         camera_container = QWidget()
         camera_container.setLayout(camera_layout)
-        camera_container.setMaximumWidth(800)
+        camera_container.setMaximumWidth(600)
         self.layout.addWidget(camera_container)
 
         # Erstelle ein horizontales Layout für Preview und Checkbox
@@ -372,7 +372,6 @@ class CameraApp(QWidget):
         version_file = os.path.join(os.path.dirname(current_exe), "version.txt")
 
         try:
-            QMessageBox.information(self, "Updating", "Downloading the new version...")
 
             # Download the new exe
             with requests.get(url, stream=True) as r:
