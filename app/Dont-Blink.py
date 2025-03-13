@@ -302,6 +302,7 @@ class CameraApp(QWidget):
 
         # updater buttons
         self.update_button = QPushButton("Check for Updates")
+        self.update_button.setFixedWidth(250)
         self.update_button.clicked.connect(self.check_for_updates)
         camera_layout.addWidget(self.update_button)
 
@@ -386,9 +387,8 @@ class CameraApp(QWidget):
             with open(update_script, "w") as f:
                 f.write(f"""@echo off
                 timeout /t 3 /nobreak > NUL
-                move /Y "{current_exe}" "{backup_exe}"
+                del /F /Q "{current_exe}"
                 move /Y "{temp_exe}" "{current_exe}"
-                echo {latest_version} > "{version_file}"
                 start "" "{current_exe}"
                 del "%~f0"
                 """)
