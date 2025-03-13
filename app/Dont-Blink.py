@@ -363,16 +363,15 @@ class CameraApp(QWidget):
             QMessageBox.critical(self, "Error", f"Failed to check for updates: {e}")
 
     def download_and_replace(self, url, latest_version):
-        """Downloads the new version and replaces the running executable."""
+        """Downloads the new version and replaces the running executable safely."""
         
         # Paths
         current_exe = sys.executable
         temp_exe = os.path.join(os.path.dirname(current_exe), "Dont-Blink-Temp.exe")
         backup_exe = os.path.join(os.path.dirname(current_exe), "Dont-Blink-Old.exe")
-        version_file = os.path.join(os.path.dirname(current_exe), "version.txt")
+        update_script = os.path.join(os.path.dirname(current_exe), "update_script.bat")
 
         try:
-
             # Download the new exe
             with requests.get(url, stream=True) as r:
                 r.raise_for_status()
@@ -381,15 +380,15 @@ class CameraApp(QWidget):
 
             QMessageBox.information(self, "Update Ready", "Update downloaded! Restarting...")
 
-            # Create an update script that replaces the exe and updates version.txt
-            update_script = os.path.join(os.path.dirname(current_exe), "update_script.bat")
+            # Create an update script that waits before replacing the exe
             with open(update_script, "w") as f:
                 f.write(f"""@echo off
-                timeout /t 3 /nobreak > NUL
-                del /F /Q "{current_exe}"
+                timeout /t 5 /nobreak > NUL
+                rename "{current_exe}" "Dont-Blink-Old.exe"
                 move /Y "{temp_exe}" "{current_exe}"
-                timeout /t 3 /nobreak > NUL
                 start "" "{current_exe}"
+                timeout /t 2 > NUL
+                del "Dont-Blink-Old.exe"
                 del "%~f0"
                 """)
 
@@ -400,7 +399,6 @@ class CameraApp(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Update Failed", f"Could not download update: {e}")
 
-    
     def select_camera(self):
         if self.cap is not None:
             self.cap.release()
