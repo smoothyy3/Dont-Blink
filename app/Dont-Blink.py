@@ -381,7 +381,7 @@ class CameraApp(QWidget):
                 with open(temp_exe, 'wb') as f:
                     shutil.copyfileobj(r.raw, f)
 
-            QMessageBox.information(self, "Update Ready", "Update downloaded! Restarting...")
+            QMessageBox.information(self, "Update Ready", "Update downloaded! Please Restart")
 
             # Create an update script that waits before replacing the exe
             with open(update_script, "w") as f:
@@ -391,7 +391,6 @@ class CameraApp(QWidget):
                 del /F /Q "%~dp0Dont-Blink.exe"
                 move /Y "%~dp0Dont-Blink-Temp.exe" "%~dp0Dont-Blink.exe"
                 timeout /t 2 /nobreak > NUL
-                start "" "%~dp0Dont-Blink.exe"
                 del "%~f0"
                 """)
 
