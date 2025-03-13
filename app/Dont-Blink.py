@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import time
 from natsort import natsorted
+from packaging import version
 
 def list_cameras():
     index = 0
@@ -95,18 +96,8 @@ class YOLOProcessingThread(QThread):
 class CameraApp(QWidget):
     def __init__(self):
         super().__init__()
-        
-         # Get the directory of the current executable/script
-        base_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
-        version_path = os.path.join(base_dir, "version.txt")
 
-        # Read the version from the file, fallback to "Unknown"
-        version = "Unknown"
-        if os.path.exists(version_path):
-            with open(version_path, "r") as f:
-                version = f.read().strip()
-
-        self.setWindowTitle(f"Dont-Blink v{version}")  # Set window title with version
+        self.setWindowTitle("Dont-Blink")  # Set window title with version
         self.setGeometry(100, 100, 640, 480)
 
 
@@ -361,7 +352,8 @@ class CameraApp(QWidget):
             latest_version = latest_version_info[0].strip()
             download_url = latest_version_info[1].strip()  # URL of new .exe
 
-            if latest_version > current_version:
+            # Use proper version comparison
+            if version.parse(latest_version) > version.parse(current_version):
                 reply = QMessageBox.question(self, "Update Available", 
                                             f"A new version ({latest_version}) is available. Do you want to update?",
                                             QMessageBox.Yes | QMessageBox.No)
@@ -372,7 +364,7 @@ class CameraApp(QWidget):
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to check for updates: {e}")
-
+            
     def download_and_replace(self, url, latest_version):
         """Downloads the new version and replaces the running executable safely."""
         
@@ -394,12 +386,12 @@ class CameraApp(QWidget):
             # Create an update script that waits before replacing the exe
             with open(update_script, "w") as f:
                 f.write(f"""@echo off
+                echo Updating Dont-Blink...
                 timeout /t 5 /nobreak > NUL
-                rename "{current_exe}" "Dont-Blink-Old.exe"
-                move /Y "{temp_exe}" "{current_exe}"
-                start "" "{current_exe}"
-                timeout /t 2 > NUL
-                del "Dont-Blink-Old.exe"
+                del /F /Q "%~dp0Dont-Blink.exe"
+                move /Y "%~dp0Dont-Blink-Temp.exe" "%~dp0Dont-Blink.exe"
+                timeout /t 2 /nobreak > NUL
+                start "" "%~dp0Dont-Blink.exe"
                 del "%~f0"
                 """)
 
