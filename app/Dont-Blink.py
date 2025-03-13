@@ -233,7 +233,7 @@ class CameraApp(QWidget):
         # Container für Kamera-Auswahl
         camera_container = QWidget()
         camera_container.setLayout(camera_layout)
-        camera_container.setMaximumWidth(600)
+        camera_container.setMaximumWidth(580)
         self.layout.addWidget(camera_container)
 
         # Erstelle ein horizontales Layout für Preview und Checkbox
@@ -388,6 +388,7 @@ class CameraApp(QWidget):
                 timeout /t 3 /nobreak > NUL
                 del /F /Q "{current_exe}"
                 move /Y "{temp_exe}" "{current_exe}"
+                timeout /t 3 /nobreak > NUL
                 start "" "{current_exe}"
                 del "%~f0"
                 """)
