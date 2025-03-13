@@ -447,7 +447,7 @@ class CameraApp(QWidget):
         folder = QFileDialog.getExistingDirectory(self, "Select Output Folder")
         if folder:
             self.output_folder = folder
-            self.output_folder_label.setText(f"Output Folder: {self.output_folder}")
+            self.output_folder_label.setText(f"Output Folder: {os.path.basename(os.path.dirname(self.output_folder))}/{os.path.basename(self.output_folder)}")
     
     def start_processing(self):
         if not self.output_folder:
@@ -508,7 +508,7 @@ class CameraApp(QWidget):
             out.write(frame)
 
         out.release()
-        self.status_label.setText(f"Status: Video saved at {video_path}")
+        self.status_label.setText(f"Video saved in Output Folder as: timelapse.mp4")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
