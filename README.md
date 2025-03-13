@@ -19,7 +19,33 @@ This project aims to create an **AI-powered timelapse system for 3D printers**, 
 
 ---
 
-## First Prototype - Initial Results  
+## **How to Use**  
+
+### **1. Download the Application**  
+- Download the latest release from [here](#).  
+- Install the application on your system.  
+
+### **2. Choose Input Source**  
+You can select one of the following options:  
+- **Live Camera**: Use a connected webcam or Raspberry Pi camera to track the printhead in real-time.  
+- **Video File**: Process an existing video file and extract timelapse frames.  
+
+### **3. Configure Output Folder**  
+- Select a folder where the images will be stored.  
+
+### **4. Start Processing**  
+- Click **"Start Processing"** to begin capturing images when the printhead is out of the frame.  
+
+### **5. Stop Processing & Create Timelapse**  
+- Once your print is finished, click **"Stop Processing"**.  
+- Click **"Create Timelapse"** to generate an **MP4 file** in the selected output folder.  
+
+### **Supported Printers**  
+- Currently optimized for **Bambulabs A1 Mini**.  
+
+---
+
+## **First Prototype - Initial Results**  
 
 ### **Training Data Samples**  
 We trained the model using captured images of different printhead positions.  
@@ -43,7 +69,7 @@ After training, the model's first results show promising detection accuracy. Her
 
 ---
 
-## Citation
+## **Citation**  
 
 ```bibtex
 @software{yolov8_ultralytics,
