@@ -239,7 +239,7 @@ class CameraApp(QWidget):
         # Erstelle ein horizontales Layout für Preview und Checkbox
         preview_layout = QHBoxLayout()
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        video_path = os.path.join(BASE_DIR,"Video.png")
+        video_path = os.path.join(BASE_DIR,"assets","Video.png")
         self.camera_preview_label = QLabel(self)
         self.camera_preview_label.setPixmap(QPixmap(video_path))
         self.camera_preview_label.setFixedSize(426, 240)
@@ -506,7 +506,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    icon_path = os.path.join(BASE_DIR,"icon.png")
+    icon_path = os.path.join(BASE_DIR,"assets","icon.png")
     app.setWindowIcon(QIcon(icon_path))
     
     window = CameraApp()
