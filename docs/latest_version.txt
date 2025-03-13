@@ -1,2 +1,2 @@
 0.2
-https://github.com/smoothyy3/Dont-Blink/releases/latest/download/Dont-Blink.exe
+https://github.com/smoothyy3/Dont-Blink/releases/download/0.2/Dont-Blink.exe
