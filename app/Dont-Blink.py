@@ -26,7 +26,6 @@ def list_cameras():
         index += 1
     return available_cameras
 
-
 class YOLOProcessingThread(QThread):
     finished_signal = pyqtSignal()
     
@@ -93,9 +92,81 @@ class YOLOProcessingThread(QThread):
         self.running = False
 
 
+class YOLOVideoProcessingThread(QThread):
+    finished_signal = pyqtSignal()
+    
+    def __init__(self, video_path, output_folder):
+        super().__init__()
+        self.video_path = video_path
+        self.output_folder = output_folder
+        self.running = True
+    
+    def run(self):
+        self.cap = cv2.VideoCapture(self.video_path)
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        weights_path = os.path.join(BASE_DIR, "weights", "best.pt")
+        model = YOLO(weights_path)
+        
+        if self.cap.get(cv2.CAP_PROP_FPS) == 30:
+            fSkip = 7.5
+        else:
+            fSkip = math.ceil(self.cap.get(cv2.CAP_PROP_FPS)/4)
+        
+        prevX = 1
+        lastWasTheSame = False
+        wiggleRoom = 0.003
+        frame_skip = fSkip
+        frame_count = 0
+        photo_taken = False
+        
+        while self.running and self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if not ret:
+                break
+
+            # extract dimensions once on first frame
+            if frame_count == 0:
+                hImg, wImg, _ = frame.shape
+
+            if frame_count % frame_skip == 0:
+                results = model.predict(frame, device="cpu")
+                frame_skip = fSkip
+                
+                for r in results:
+                    for box in r.boxes:
+                        x, y, w, h = box.xywh[0].tolist() # Get the x, y, w, h coordinates.
+                        xNorm, yNorm, wNorm, hNorm =  x/wImg, y/hImg, w/wImg, h/hImg
+                        
+                        if abs(xNorm - prevX) < wiggleRoom:
+                            prevX = xNorm
+                            if not lastWasTheSame:
+                                lastWasTheSame = True
+                            elif not photo_taken:
+                                filename = os.path.join(self.output_folder, f"frame_{frame_count}.jpg")
+                                cv2.imwrite(filename, frame)
+                                photo_taken = True
+                        else:
+                            lastWasTheSame = False
+                            photo_taken = False
+                        
+                        if prevX > xNorm:
+                            prevX = xNorm
+            frame_count += 1
+        
+        self.finished_signal.emit()
+    
+    def stop(self):
+        self.running = False
+
 class CameraApp(QWidget):
     def __init__(self):
         super().__init__()
+
+        # Initialize the main layout first
+        self.layout = QVBoxLayout()  # Ensure it's a QVBoxLayout before adding widgets
+
+        # ---- Title Bar Layout ----
+        title_layout = QHBoxLayout()
 
         if getattr(sys, 'frozen', False):
             base_path = sys._MEIPASS  # PyInstaller temp extraction folder
@@ -111,9 +182,26 @@ class CameraApp(QWidget):
                 current_version = f.read().strip()
 
         # Set window title with version
-        self.setWindowTitle(f"Dont-Blink v{current_version}")
-        self.setFixedSize(624, 600)  # Set window to 640x480 and disable resizing
+        self.setWindowTitle(f"Dont-Blink v{current_version}")  
 
+        title_layout.addStretch()  # Pushes the update button to the right
+
+        # Updated update button (small and on the right)
+        self.update_button = QPushButton("Check for Update")
+        self.update_button.setFixedSize(170, 30)  # Adjusted size
+        self.update_button.setObjectName("update_button")  # Apply custom QSS
+        self.update_button.clicked.connect(self.check_for_updates)
+        title_layout.addWidget(self.update_button)
+
+
+        # Create a title container and add it to the main layout
+        title_container = QWidget()
+        title_container.setLayout(title_layout)
+        self.layout.addWidget(title_container)  # Add title layout to the top
+
+        self.setLayout(self.layout)
+
+        self.setFixedSize(624, 600)  # Set window to 640x480 and disable resizing
 
         # Setzt das QSS für das gesamte Fenster
         self.setStyleSheet("""
@@ -137,6 +225,25 @@ class CameraApp(QWidget):
             border-radius: 5px;
             font-size: 14px;
         }
+                           
+        QPushButton#update_button {
+            background-color: #4CAF50;
+            color: white;
+            border: 1px solid #4CAF50;
+            padding: 5px 15px;
+            border-radius: 15px;  /* Ensure it's rounded */
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        QPushButton#update_button:hover {
+            background-color: #45a049;
+        }
+
+        QPushButton#update_button:pressed {
+            background-color: #388e3c;
+        }
+
 
         QComboBox::drop-down {
             border-radius: 5px;
@@ -227,30 +334,41 @@ class CameraApp(QWidget):
             background-color: #f5f5f5;
         }
         """) 
-        self.layout = QVBoxLayout()
+                # Add input selection dropdown
+        self.input_selection = QComboBox()
+        self.input_selection.addItems(["Webcam", "MP4 File"])
+        self.input_selection.currentIndexChanged.connect(self.update_input_selection)
+        self.layout.addWidget(self.input_selection)
 
-        self.label = QLabel("Select Camera:")
-        self.layout.addWidget(self.label)
+        # Layout for input method (either camera or video file)
+        self.input_method_layout = QHBoxLayout()
 
-        # Erstelle ein horizontales Layout für ComboBox und Button
-        camera_layout = QHBoxLayout()
-
+         # Camera selection (Initially hidden)
         self.camera_selection = QComboBox()
         self.available_cameras = list_cameras()
         if not self.available_cameras:
             self.available_cameras.append("No cameras found")
         self.camera_selection.addItems(self.available_cameras)
-        camera_layout.addWidget(self.camera_selection)
+        self.camera_selection.setVisible(False)
+        self.input_method_layout.addWidget(self.camera_selection)
 
+        # Confirm Camera button (Initially hidden)
         self.select_button = QPushButton("Confirm Camera")
         self.select_button.clicked.connect(self.select_camera)
-        camera_layout.addWidget(self.select_button)
+        self.select_button.setVisible(False)
+        self.input_method_layout.addWidget(self.select_button)
 
-        # Container für Kamera-Auswahl
-        camera_container = QWidget()
-        camera_container.setLayout(camera_layout)
-        camera_container.setMaximumWidth(580)
-        self.layout.addWidget(camera_container)
+        # Select Video File button (Initially hidden)
+        self.select_video_button = QPushButton("Select MP4 File")
+        self.select_video_button.clicked.connect(self.select_video_file)
+        self.select_video_button.setVisible(False)
+        self.input_method_layout.addWidget(self.select_video_button)
+
+        # Add input method layout to the main layout
+        self.layout.addLayout(self.input_method_layout)
+
+        # Call update_input_selection() to set the correct visibility on startup
+        self.update_input_selection()
 
         # Erstelle ein horizontales Layout für Preview und Checkbox
         preview_layout = QHBoxLayout()
@@ -316,12 +434,6 @@ class CameraApp(QWidget):
         timelapse_container.setMaximumWidth(600)  # Kann angepasst werden
         self.layout.addWidget(timelapse_container)
 
-        # updater buttons
-        self.update_button = QPushButton("Check for Updates")
-        self.update_button.setFixedWidth(250)
-        self.update_button.clicked.connect(self.check_for_updates)
-        camera_layout.addWidget(self.update_button)
-
         self.setLayout(self.layout)
         self.cap = None
         self.timer = QTimer(self)
@@ -329,15 +441,43 @@ class CameraApp(QWidget):
         self.output_folder = ""
         self.current_session_folder = ""
         self.processing_thread = None
+        self.video_processing_thread = None
         self.model = YOLO(os.path.join(os.path.dirname(os.path.abspath(__file__)), "weights", "best.pt"))
 
-        
         self.camera_selection.setFixedWidth(50)
         self.select_button.setFixedWidth(250)
         self.select_folder_button.setFixedWidth(250)
         self.start_button.setFixedWidth(250)
         self.stop_button.setFixedWidth(250)
         self.timelapse_button.setFixedWidth(250)
+
+    def update_input_selection(self):
+        """Show the correct UI elements based on input selection"""
+        selected_input = self.input_selection.currentText()
+
+        if selected_input == "Webcam":
+            self.camera_selection.setVisible(True)
+            self.select_button.setVisible(True)
+            self.select_video_button.setVisible(False)
+        else:
+            self.camera_selection.setVisible(False)
+            self.select_button.setVisible(False)
+            self.select_video_button.setVisible(True)
+
+
+    def select_video_file(self):
+        """Let the user choose an MP4 file as input."""
+        file_dialog = QFileDialog()
+        file_path, _ = file_dialog.getOpenFileName(self, "Select Video File", "", "Video Files (*.mp4)")
+
+        if file_path:
+            self.video_file = file_path
+            QMessageBox.information(self, "Video Selected", f"Using video file: {os.path.basename(file_path)}")
+
+            # Start a new thread for MP4 playback
+            self.cap = cv2.VideoCapture(self.video_file)
+            self.is_video = True
+            self.timer.start(50)
 
     def check_for_updates(self):
         latest_version_url = "https://smoothyy3.github.io/Dont-Blink/latest_version.txt"  # Your GitHub Pages URL
@@ -431,11 +571,17 @@ class CameraApp(QWidget):
             QMessageBox.critical(self, "Error", "Could not open selected camera.")
             return
 
+        self.is_video = False
         self.timer.start(50)
     
     def update_preview(self):
         if self.cap is not None and self.cap.isOpened():
             ret, frame = self.cap.read()
+
+            if self.is_video and not ret:
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Restart video
+                ret, frame = self.cap.read()
+
             if ret:
                 if self.check_detection.isChecked():
                     results = self.model(frame, conf=0.5)
@@ -455,7 +601,7 @@ class CameraApp(QWidget):
                 pixmap = QPixmap.fromImage(qimg).scaled(426, 240)
                 self.camera_preview_label.setPixmap(pixmap)
         else:
-            self.timer.stop()        
+            self.timer.stop() 
     
     def select_output_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Output Folder")
@@ -471,14 +617,39 @@ class CameraApp(QWidget):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.current_session_folder = os.path.join(self.output_folder, f"session_{timestamp}")
         os.makedirs(self.current_session_folder, exist_ok=True)
+
+        self.input_type = self.input_selection.currentText()
+
+        if self.input_type == "Webcam":
+            selected_text = self.camera_selection.currentText()
+            self.selected_camera = int(selected_text)
+            self.cap = cv2.VideoCapture(self.selected_camera)
+
+        elif self.input_type == "MP4 File":
+            if not hasattr(self, 'video_file') or not self.video_file:
+                QMessageBox.warning(self, "No Video Selected", "Please select a video file before starting processing.")
+                return
+            self.cap = cv2.VideoCapture(self.video_file)  # Open video file
+            if not self.cap.isOpened():
+                QMessageBox.critical(self, "Error", "Could not open the selected video file.")
+                return
+            ret, frame = self.cap.read()
+            if not ret:
+                QMessageBox.critical(self, "Error", "Could not read the first frame of the video.")
+                return
+            print(f"🎥 First frame read successfully: {frame.shape}")
+
         self.processing_thread = YOLOProcessingThread(self.cap, self.current_session_folder)
+        self.video_processing_thread = YOLOVideoProcessingThread(self.cap, self.current_session_folder)
         self.processing_thread.finished_signal.connect(self.processing_finished)
+        self.video_processing_thread.finished_signal.connect(self.processing_finished)
         self.processing_thread.start()
+
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
         self.check_detection.setChecked(False)
         self.check_detection.setEnabled(False)
-    
+
     def stop_processing(self):
         if self.processing_thread:
             self.processing_thread.stop()
