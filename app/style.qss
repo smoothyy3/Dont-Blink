@@ -1,0 +1,127 @@
+QWidget {
+    background-color: #ffffff;
+    font-family: "Segoe UI", sans-serif;
+    color: #333;
+    border-radius: 10px;
+}
+
+QLabel {
+    font-size: 14px;
+    font-weight: bold;
+    color: #444;
+}
+
+QComboBox {
+    background-color: #ffffff;
+    border: 1px solid #d1d1d1;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+QComboBox::drop-down {
+    border-radius: 5px;
+}
+
+QPushButton#update_button {
+    background-color: #4CAF50;
+    color: white;
+    border: 1px solid #4CAF50;
+    padding: 5px 15px;
+    border-radius: 15px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+QPushButton#update_button:hover {
+    background-color: #45a049;
+}
+
+QPushButton#update_button:pressed {
+    background-color: #388e3c;
+}
+
+QPushButton {
+    background-color: #4CAF50;
+    color: white;
+    border: 1px solid #4CAF50;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background-color: #45a049;
+}
+
+QPushButton:pressed {
+    background-color: #388e3c;
+}
+
+QPushButton:disabled {
+    background-color: #dcdcdc;
+    color: #a5a5a5;
+}
+
+QCheckBox {
+    font-size: 14px;
+    padding: 5px 10px;
+    color: #444;
+}
+
+QCheckBox::indicator {
+    width: 15px;
+    height: 15px;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #4CAF50;
+    border-radius: 5px;
+}
+
+QCheckBox::indicator:unchecked {
+    background-color: #dcdcdc;
+    border-radius: 5px;
+}
+
+QLineEdit {
+    background-color: #ffffff;
+    border: 1px solid #d1d1d1;
+    padding: 5px;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+QLabel#camera_preview_label {
+    background-color: #222222;
+    border-radius: 5px;
+}
+
+QScrollArea {
+    background-color: #f5f5f5;
+    border-radius: 10px;
+    border: 1px solid #d1d1d1;
+}
+
+QScrollBar {
+    width: 10px;
+    background-color: #f5f5f5;
+}
+
+QScrollBar::handle {
+    background-color: #cccccc;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:hover {
+    background-color: #aaaaaa;
+}
+
+QScrollBar::add-line, QScrollBar::sub-line {
+    background-color: #f5f5f5;
+}
+
+QScrollBar::up-arrow, QScrollBar::down-arrow {
+    background-color: #f5f5f5;
+}
