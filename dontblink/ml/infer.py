@@ -142,6 +142,45 @@ class CustomDetector:
         
         return results
     
+    def detect_raw(self, frame: np.ndarray) -> dict:
+        """
+        Return raw model outputs for a frame without applying any threshold.
+        Useful for uncertainty sampling in the contribution pipeline.
+
+        Returns:
+            Dict with keys: p_present, x_norm, y_norm, w_norm, h_norm
+        """
+        input_tensor = self._preprocess(frame)
+        with torch.no_grad():
+            outputs = self.model(input_tensor)
+        return {
+            "p_present": outputs[0, 0].item(),
+            "x_norm": outputs[0, 1].item(),
+            "y_norm": outputs[0, 2].item(),
+            "w_norm": outputs[0, 3].item(),
+            "h_norm": outputs[0, 4].item(),
+        }
+
+    def detect_raw_batch(self, frames: List[np.ndarray]) -> List[dict]:
+        """
+        Return raw model outputs for a batch of frames without thresholding.
+        """
+        if not frames:
+            return []
+        batch = torch.cat([self._preprocess(f) for f in frames], dim=0)
+        with torch.no_grad():
+            outputs = self.model(batch)
+        results = []
+        for i in range(outputs.shape[0]):
+            results.append({
+                "p_present": outputs[i, 0].item(),
+                "x_norm": outputs[i, 1].item(),
+                "y_norm": outputs[i, 2].item(),
+                "w_norm": outputs[i, 3].item(),
+                "h_norm": outputs[i, 4].item(),
+            })
+        return results
+
     def _preprocess(self, frame: np.ndarray) -> torch.Tensor:
         """
         Preprocess frame for model input.

@@ -107,6 +107,18 @@ class DetectionService:
         detections = self.detect(frame, confidence)
         return detections[0] if detections else None
     
+    def detect_raw(self, frame: cv2.Mat) -> dict:
+        """Return raw model outputs (no threshold) for uncertainty sampling."""
+        if self.model is None:
+            raise RuntimeError("Model not loaded")
+        return self.model.detect_raw(frame)
+
+    def detect_raw_batch(self, frames: List[cv2.Mat]) -> list:
+        """Return raw model outputs for a batch of frames (no threshold)."""
+        if self.model is None:
+            raise RuntimeError("Model not loaded")
+        return self.model.detect_raw_batch(frames)
+
     def detect_batch(self, frames: List[cv2.Mat], confidence: Optional[float] = None, original_dims: Optional[List[tuple]] = None) -> List[List[DetectionResult]]:
         """
         Detect printhead in multiple frames (batch processing for better performance).
@@ -198,65 +210,124 @@ class DetectionService:
 class PrintheadTracker:
     """
     Tracks printhead position over time to determine when to capture frames.
+
+    Capture modes (user chooses where the head parks):
+      - ``left-park``: capture when the head is stationary at its leftmost position (default).
+      - ``right-park``: capture when the head is stationary at its rightmost position.
+      - ``top-park``: capture when the head is stationary at its topmost position (e.g. overhead camera).
+      - ``out-of-view``: capture only when the model reports no printhead.
     """
-    
-    def __init__(self, config: Config):
-        """
-        Initialize tracker.
-        
-        Args:
-            config: Configuration object
-        """
+
+    MODES = ("left-park", "right-park", "top-park", "out-of-view")
+
+    def __init__(self, config: Config, capture_mode: str = "left-park"):
+        if capture_mode not in self.MODES:
+            raise ValueError(f"Unknown capture_mode '{capture_mode}', expected one of {self.MODES}")
+
         self.config = config
+        self.capture_mode = capture_mode
         self.wiggle_room = config.wiggle_room
-        self.prev_x_norm = 1.0
-        self.last_was_same = False
-        self.photo_taken = False
-    
+
+        # Left-park state
+        self._lp_prev_x = 1.0
+        self._lp_was_same = False
+        self._lp_photo_taken = False
+        # Right-park state
+        self._rp_prev_x = 0.0
+        self._rp_was_same = False
+        self._rp_photo_taken = False
+        # Top-park state
+        self._tp_prev_y = 1.0
+        self._tp_was_same = False
+        self._tp_photo_taken = False
+
     def should_capture(self, detection: Optional[DetectionResult]) -> bool:
-        """
-        Determine if frame should be captured based on printhead position.
-        
-        Logic:
-        - Capture when printhead is stationary (same position for 2+ frames)
-        - This indicates printhead is out of the way
-        
-        Args:
-            detection: Current detection result (None if not detected)
-            
-        Returns:
-            True if frame should be captured
-        """
-        if detection is None:
-            self.last_was_same = False
-            self.photo_taken = False
-            return True
-        
-        x_norm = detection.x_normalized
-        
-        if abs(x_norm - self.prev_x_norm) < self.wiggle_room:
-            self.prev_x_norm = x_norm
-            
-            if not self.last_was_same:
-                self.last_was_same = True
-                return False
-            elif not self.photo_taken:
-                self.photo_taken = True
-                return True
-            else:
-                return False
-        else:
-            self.last_was_same = False
-            self.photo_taken = False
-            
-            if self.prev_x_norm > x_norm:
-                self.prev_x_norm = x_norm
-            
-            return False
-    
+        if self.capture_mode == "left-park":
+            return self._left_park(detection)
+        if self.capture_mode == "right-park":
+            return self._right_park(detection)
+        if self.capture_mode == "top-park":
+            return self._top_park(detection)
+        # out-of-view
+        return detection is None
+
     def reset(self):
-        """Reset tracker state."""
-        self.prev_x_norm = 1.0
-        self.last_was_same = False
-        self.photo_taken = False
+        self._lp_prev_x = 1.0
+        self._lp_was_same = False
+        self._lp_photo_taken = False
+        self._rp_prev_x = 0.0
+        self._rp_was_same = False
+        self._rp_photo_taken = False
+        self._tp_prev_y = 1.0
+        self._tp_was_same = False
+        self._tp_photo_taken = False
         logger.debug("Tracker reset")
+
+    def get_stats(self) -> dict:
+        """Return tracker diagnostics for run.json / CLI output."""
+        return {"capture_mode": self.capture_mode}
+
+    # ------------------------------------------------------------------
+    # Park modes: left, right, top
+    # ------------------------------------------------------------------
+
+    def _left_park(self, detection: Optional[DetectionResult]) -> bool:
+        if detection is None:
+            self._lp_was_same = False
+            self._lp_photo_taken = False
+            return True
+        x = detection.x_normalized
+        if abs(x - self._lp_prev_x) < self.wiggle_room:
+            self._lp_prev_x = x
+            if not self._lp_was_same:
+                self._lp_was_same = True
+                return False
+            if not self._lp_photo_taken:
+                self._lp_photo_taken = True
+                return True
+            return False
+        self._lp_was_same = False
+        self._lp_photo_taken = False
+        if self._lp_prev_x > x:
+            self._lp_prev_x = x
+        return False
+
+    def _right_park(self, detection: Optional[DetectionResult]) -> bool:
+        if detection is None:
+            self._rp_was_same = False
+            self._rp_photo_taken = False
+            return True
+        x = detection.x_normalized
+        if abs(x - self._rp_prev_x) < self.wiggle_room:
+            if not self._rp_was_same:
+                self._rp_was_same = True
+                return False
+            if not self._rp_photo_taken:
+                self._rp_photo_taken = True
+                return True
+            return False
+        self._rp_was_same = False
+        self._rp_photo_taken = False
+        if self._rp_prev_x < x:
+            self._rp_prev_x = x
+        return False
+
+    def _top_park(self, detection: Optional[DetectionResult]) -> bool:
+        if detection is None:
+            self._tp_was_same = False
+            self._tp_photo_taken = False
+            return True
+        y = detection.y_normalized
+        if abs(y - self._tp_prev_y) < self.wiggle_room:
+            if not self._tp_was_same:
+                self._tp_was_same = True
+                return False
+            if not self._tp_photo_taken:
+                self._tp_photo_taken = True
+                return True
+            return False
+        self._tp_was_same = False
+        self._tp_photo_taken = False
+        if self._tp_prev_y > y:
+            self._tp_prev_y = y
+        return False

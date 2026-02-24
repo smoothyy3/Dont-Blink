@@ -1,10 +1,12 @@
-# Dont-Blink — AI Timelapse for 3D Printers
+# Dont-Blink — Clean Timelapses for 3D Printers
 
 [![PyPI version](https://img.shields.io/pypi/v/dontblink)](https://pypi.org/project/dontblink/)
 [![Python](https://img.shields.io/pypi/pyversions/dontblink)](https://pypi.org/project/dontblink/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-Dont-Blink watches your 3D print video and captures frames **only when the printhead is out of the way**, producing clean timelapses with no printhead photobombs.
+Dont-Blink post-processes your 3D print recordings into smooth timelapses where the object appears to grow on its own — no printhead in the frame. It uses local computer vision to detect when the printhead is parked or out of view, and selects only those frames.
+
+**No cloud uploads. No firmware mods. No plugins. Just record your print, run one command.**
 
 <p align="center">
   <a href="https://youtu.be/nMrHcGVqUqU">
@@ -16,11 +18,30 @@ Dont-Blink watches your 3D print video and captures frames **only when the print
 
 ## How it works
 
-1. A lightweight MobileNetV3-based model detects the printhead position in each frame
-2. A tracker monitors printhead movement and captures frames when it parks
-3. Captured frames are stitched into a smooth timelapse video
+1. You record your 3D print with any camera (phone, webcam, IP cam).
+2. Dont-Blink scans the video using a lightweight MobileNetV3 model to detect the printhead in each frame.
+3. It selects frames where the printhead is **parked** (stationary) or **out of view**.
+4. Those frames are stitched into a smooth timelapse video.
 
-Works with **pre-recorded videos** and **live camera feeds**. Runs on CPU, Apple Silicon (MPS), or NVIDIA GPU.
+Everything runs locally on your machine — CPU, Apple Silicon (MPS), or NVIDIA GPU.
+
+## What it needs to work well
+
+Dont-Blink is **post-processing frame selection**, not magic. It needs something to select *from*:
+
+- **Best case:** Your printer has a timelapse mode that parks the printhead (e.g., Bambu Studio Smooth Timelapse). Dont-Blink will find those parked frames automatically.
+- **Easy setup:** Add a small G-code snippet to park the head every layer or every N layers. [See the printer setup guide.](docs/printer-setup.md)
+- **Camera trick:** Position your camera so the printhead naturally moves out of frame during travel moves.
+
+If your video has no consistent "clean moment," the output may be inconsistent. The tool will warn you if it detects this.
+
+## How this differs from alternatives
+
+| Tool | Approach | Pros | Cons |
+|---|---|---|---|
+| **Octolapse / Klipper timelapse** | Printer-controlled: parks head + takes snapshot per layer | Perfect frame-per-layer result | Adds print time, requires plugin/firmware config |
+| **CyberBrick / hardware trigger kits** | External camera trigger synced to G-code | Works with DSLRs, high quality | Requires hardware purchase + wiring |
+| **Dont-Blink** | Post-processing: finds "clean" frames from a continuous recording | No printer mods needed, any camera, runs after the fact | Needs a "clean moment" in the video (park/out-of-view) |
 
 ## Quick start
 
@@ -41,17 +62,47 @@ The model weights (~13 MB) download automatically on first run.
 ### Process a video
 
 ```bash
-dontblink process input.mp4
+dontblink process print_recording.mp4
 ```
 
-That's it. Output goes to `outputs/input/frames/` and `outputs/input/timelapse.mp4`.
+Tell the tool where your printhead parks (default is left). If it parks on the right or at the top, or moves out of frame, set `--capture-mode`:
+
+```bash
+dontblink process print_recording.mp4                           # default: left-park
+dontblink process print_recording.mp4 --capture-mode right-park  # parks on the right
+dontblink process print_recording.mp4 --capture-mode top-park    # parks at top
+dontblink process print_recording.mp4 --capture-mode out-of-view # head moves out of frame
+```
+
+Output appears next to the input video:
+
+```
+print_recording.mp4           <- your input
+print_recording/              <- created automatically
+  frames/
+    frame_000000.jpg
+    ...
+  timelapse.mp4               <- the result
+```
+
+### Help improve the model
+
+The detection model gets better with diverse training data. You can contribute labeled frames from your own prints in about 2 minutes:
+
+```bash
+dontblink contribute print_recording.mp4
+```
+
+This scans your video, selects uncertain frames, opens a review UI in your browser, and packages the result for submission. No raw video is shared.
 
 ## CLI reference
 
 ```
-dontblink process <video>              Process a video (recommended entry point)
+dontblink process <video>              Process a video (recommended)
 dontblink process <video> --rotation 90  Override video rotation
 dontblink process <video> --print-config Show resolved config and exit
+
+dontblink contribute <video>           Contribute labeled frames to improve the model
 
 dontblink create-timelapse <dir> <out>  Stitch frames into a timelapse
 dontblink process-camera <id> <out>     Process a live camera feed
@@ -87,44 +138,11 @@ Key settings:
 
 See [`config.yaml.example`](config.yaml.example) for all options.
 
-## Python API
+## Printer setup guide
 
-```python
-from dontblink.config import Config
-from dontblink.detection import DetectionService
-from dontblink.video_processor import VideoProcessor
-from dontblink.timelapse import TimelapseGenerator
+For best results, your printer needs a repeatable "clean moment" — a point in each layer where the printhead is parked or out of view.
 
-config = Config("config.yaml")
-detection = DetectionService(config)
-processor = VideoProcessor(config, detection)
-
-stats = processor.process_video_file("input.mp4", "output/frames")
-
-timelapse = TimelapseGenerator(config)
-timelapse.create_timelapse("output/frames", "timelapse.mp4")
-```
-
-## Architecture
-
-```
-dontblink/
-├── cli.py              Command-line interface
-├── config.py           YAML configuration with defaults
-├── detection.py        Detection service + printhead tracker
-├── model_manager.py    Model download, caching, SHA-256 verification
-├── video_processor.py  Video/camera processing with batch inference
-├── timelapse.py        Timelapse generation from frames
-├── utils.py            Device detection, validation, fingerprinting
-├── types.py            DetectionResult type
-└── ml/                 Training & inference
-    ├── model.py        MobileNetV3-Small backbone + detection head
-    ├── infer.py        Inference with batch support
-    ├── train.py        Training loop with early stopping
-    ├── dataset.py      YOLO-format dataset with augmentation
-    ├── eval.py         Precision, recall, F1, IoU metrics
-    └── config.py       Training hyperparameters
-```
+**[Read the full printer setup guide](docs/printer-setup.md)** for G-code snippets for Cura, PrusaSlicer, OrcaSlicer, Klipper, and Bambu Studio.
 
 ## Model
 
@@ -133,7 +151,7 @@ dontblink/
 - **Size**: ~13 MB
 - **Inference**: ~16 ms/frame on CPU, ~5 ms on MPS/CUDA
 
-Currently optimized for **Bambu Lab A1 Mini** but works with other printers given appropriate camera positioning.
+Currently optimized for **Bambu Lab A1 Mini** but works with other printers given appropriate camera positioning. The `contribute` command helps expand printer coverage over time.
 
 ## Training your own model
 
@@ -154,6 +172,14 @@ dontblink doctor --copy
 ```
 
 ## Contributing
+
+**Help improve the model** — the easiest way to contribute:
+
+```bash
+dontblink contribute your_print_video.mp4
+```
+
+**Develop locally:**
 
 ```bash
 git clone https://github.com/smoothyy3/Dont-Blink.git

@@ -10,6 +10,17 @@ from .utils import calculate_frame_skip, ensure_directory
 logger = logging.getLogger(__name__)
 
 
+def _disable_auto_rotation(cap: cv2.VideoCapture):
+    """
+    Disable OpenCV's automatic rotation so we handle it ourselves.
+    Newer OpenCV (pip-installed) defaults ORIENTATION_AUTO=1 which auto-rotates
+    frames, but still reports the original metadata — causing double rotation
+    when our code also applies it.
+    """
+    if hasattr(cv2, 'CAP_PROP_ORIENTATION_AUTO'):
+        cap.set(cv2.CAP_PROP_ORIENTATION_AUTO, 0)
+
+
 def _empty_stats() -> Dict[str, Any]:
     return {
         'frames_total': 0,
@@ -37,7 +48,7 @@ class VideoProcessor:
         """
         self.config = config
         self.detection_service = detection_service
-        self.tracker = PrintheadTracker(config)
+        self.tracker = PrintheadTracker(config, capture_mode=config.capture_mode)
     
     def process_video_file(self, video_path: str, output_folder: str, progress_callback: Optional[Callable[[int, int], None]] = None) -> Dict[str, Any]:
         """
@@ -59,6 +70,8 @@ class VideoProcessor:
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise ValueError(f"Could not open video file: {video_path}")
+        
+        _disable_auto_rotation(cap)
         
         try:
             fps = cap.get(cv2.CAP_PROP_FPS)
@@ -98,6 +111,8 @@ class VideoProcessor:
         cap = cv2.VideoCapture(camera_index)
         if not cap.isOpened():
             raise ValueError(f"Could not open camera {camera_index}")
+        
+        _disable_auto_rotation(cap)
         
         try:
             fps = cap.get(cv2.CAP_PROP_FPS)

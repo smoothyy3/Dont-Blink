@@ -151,6 +151,8 @@ def check_video_readable(video_path: str) -> dict:
         raise ValueError(f"Video file is empty (0 bytes): {video_path}")
 
     cap = cv2.VideoCapture(video_path)
+    if hasattr(cv2, 'CAP_PROP_ORIENTATION_AUTO'):
+        cap.set(cv2.CAP_PROP_ORIENTATION_AUTO, 0)
     if not cap.isOpened():
         ext = Path(video_path).suffix.lower()
         raise ValueError(
@@ -201,17 +203,18 @@ def get_organized_output_paths(video_path: str, base_output_dir: str = "outputs"
     """
     Generate organized output paths for video processing.
     
-    Creates structure:
-        outputs/
-          video_name/
-            frames/
-              frame_000000.jpg
-              ...
-            timelapse.mp4
+    Default: output is placed next to the input video file:
+        /path/to/video_name/
+          frames/
+            frame_000000.jpg
+            ...
+          timelapse.mp4
+    
+    If base_output_dir is explicitly set in config, uses that instead.
     
     Args:
         video_path: Path to input video file
-        base_output_dir: Base directory for outputs (default: "outputs")
+        base_output_dir: Base directory for outputs (default: next to video)
         organize_by_video: Whether to create subfolder per video
         
     Returns:
@@ -222,17 +225,16 @@ def get_organized_output_paths(video_path: str, base_output_dir: str = "outputs"
     """
     from pathlib import Path
     
-    video_path_obj = Path(video_path)
-    video_name = video_path_obj.stem  # Name without extension
+    video_path_obj = Path(video_path).resolve()
+    video_name = video_path_obj.stem
+    video_dir = video_path_obj.parent
     
     if organize_by_video:
-        # Create: outputs/video_name/
-        base_dir = Path(base_output_dir) / video_name
+        base_dir = Path(base_output_dir) / video_name if base_output_dir != "outputs" else video_dir / video_name
         frames_dir = base_dir / "frames"
         timelapse_path = base_dir / "timelapse.mp4"
     else:
-        # Create: outputs/frames/ and outputs/timelapse.mp4
-        base_dir = Path(base_output_dir)
+        base_dir = Path(base_output_dir) if base_output_dir != "outputs" else video_dir
         frames_dir = base_dir / "frames"
         timelapse_path = base_dir / f"{video_name}_timelapse.mp4"
     

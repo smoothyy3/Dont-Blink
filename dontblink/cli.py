@@ -26,6 +26,12 @@ from .utils import (
 logger = logging.getLogger(__name__)
 
 
+def _disable_orientation_auto(cap):
+    """Prevent OpenCV from auto-rotating frames (we handle rotation ourselves)."""
+    if hasattr(cv2, 'CAP_PROP_ORIENTATION_AUTO'):
+        cap.set(cv2.CAP_PROP_ORIENTATION_AUTO, 0)
+
+
 def _setup_global_flags(args):
     """Apply global CLI flags (--verbose, --log) to logging config."""
     log_level = logging.DEBUG if getattr(args, 'verbose', False) else logging.INFO
@@ -548,6 +554,11 @@ def process_video(args):
     if rotation_override is not None:
         config.set('processing.video_rotation', rotation_override)
         logger.info(f"CLI rotation override: {rotation_override} degrees")
+
+    capture_mode_override = getattr(args, 'capture_mode', None)
+    if capture_mode_override is not None:
+        config.set('detection.capture_mode', capture_mode_override)
+        logger.info(f"CLI capture mode override: {capture_mode_override}")
     
     if getattr(args, 'print_config', False):
         _print_resolved_config(config)
@@ -613,6 +624,8 @@ def process_video(args):
         inference_times = stats.get('inference_times_ms', [])
         avg_inference = sum(inference_times) / len(inference_times) if inference_times else 0
         
+        tracker_stats = video_processor.tracker.get_stats()
+
         print(f"\n{'='*50}")
         print(f"  PROCESSING COMPLETE")
         print(f"{'='*50}")
@@ -624,12 +637,27 @@ def process_video(args):
         if stats.get('rotation_applied', 0) != 0:
             print(f"  Rotation applied: {stats['rotation_applied']} degrees")
         print(f"  Device:           {detection_service.device}")
+        print(f"  Capture mode:     {tracker_stats['capture_mode']}")
         print(f"  Frames saved to:  {frames_dir}")
         if timelapse_path:
             print(f"  Timelapse:        {timelapse_path}")
         else:
             print(f"  Create timelapse: dontblink create-timelapse {frames_dir}")
         print(f"{'='*50}")
+
+        frames_captured = stats['frames_captured']
+        frames_analyzed = stats.get('frames_analyzed', 0)
+        if frames_analyzed > 0 and frames_captured < 10:
+            ratio = frames_captured / frames_analyzed
+            print(f"\n  Warning: Only {frames_captured} frames selected from {frames_analyzed} analyzed.")
+            if ratio < 0.01:
+                print(f"  Your video may not have consistent 'clean moments' (parked/out-of-view).")
+                print(f"  See: https://github.com/smoothyy3/Dont-Blink/blob/main/docs/printer-setup.md")
+            elif frames_captured == 0:
+                print(f"  No frames were selected — the model may not have detected the printhead,")
+                print(f"  or the head never stayed in one position long enough.")
+                print(f"  Try: dontblink visualize-video {input_path} debug.mp4")
+            print()
         
         # Write run.json
         output_base = paths['base_dir'] if not args.output and organize_by_video else frames_dir
@@ -659,6 +687,7 @@ def process_video(args):
                     'frame_skip': stats.get('frame_skip', 0),
                     'batch_size': stats.get('batch_size', 1),
                 },
+                'tracker': tracker_stats,
                 'output': {
                     'frames_dir': frames_dir,
                     'timelapse': timelapse_path,
@@ -847,6 +876,8 @@ def visualize_video(args):
         print(f"Error: Could not open video file: {input_video}", file=sys.stderr)
         return 1
     
+    _disable_orientation_auto(cap)
+    
     fps = cap.get(cv2.CAP_PROP_FPS)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -961,6 +992,8 @@ def extract_frames(args):
             logger.warning(f"Could not open video: {video_path}")
             continue
         
+        _disable_orientation_auto(cap)
+        
         fps = cap.get(cv2.CAP_PROP_FPS)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = total_frames / fps if fps > 0 else 0
@@ -1013,6 +1046,172 @@ def extract_frames(args):
     return 0
 
 
+def contribute(args):
+    """Run the data contribution pipeline: scan → review → bundle."""
+    import tempfile
+    from .contribute import scan_video, prepare_review_data, create_bundle, zip_bundle
+    from .labeling_server import launch_review_ui
+
+    _setup_global_flags(args)
+    config = Config(args.config)
+
+    video_path = args.input
+    if not os.path.isfile(video_path):
+        print(f"Error: Video file not found: {video_path}", file=sys.stderr)
+        return 1
+
+    # --- Step 1: Scan video and select candidate frames ---
+    print(f"\n=== Step 1/4: Scanning video for interesting frames ===\n")
+
+    detection_service = DetectionService(config)
+    confidence = config.confidence
+
+    candidates = scan_video(
+        video_path=video_path,
+        detection_service=detection_service,
+        confidence_threshold=confidence,
+        sample_interval_s=args.interval,
+        max_candidates=args.frames,
+        min_time_gap_s=args.min_gap,
+    )
+
+    if not candidates:
+        print("No candidate frames found. The video may be too short or uniform.")
+        return 1
+
+    print(f"\nSelected {len(candidates)} candidate frames for review.")
+
+    # --- Step 2: Prepare work directory and launch labeling UI ---
+    print(f"\n=== Step 2/4: Launching labeling UI ===\n")
+
+    work_dir = Path(tempfile.mkdtemp(prefix="dontblink_contribute_"))
+    review_items = prepare_review_data(candidates, work_dir)
+
+    labels = launch_review_ui(work_dir, review_items)
+
+    if not labels:
+        print("No labels collected. Aborting.")
+        return 1
+
+    confirmed = sum(1 for v in labels.values() if v == "confirm")
+    rejected = sum(1 for v in labels.values() if v == "reject")
+    no_head = sum(1 for v in labels.values() if v == "no_printhead")
+    print(f"\nLabeling complete: {confirmed} confirmed, {rejected} rejected, {no_head} no-printhead")
+
+    # --- Step 3: Collect metadata ---
+    print(f"\n=== Step 3/4: Printer / camera metadata ===\n")
+    print("Please provide some context about this print (press Enter to skip).\n")
+
+    metadata = {}
+    metadata["printer_model"] = input("  Printer model (e.g. Ender 3, Bambu X1C): ").strip() or "unknown"
+    metadata["camera_mount"] = input("  Camera mount (e.g. bed-mounted, frame, tripod): ").strip() or "unknown"
+    metadata["lighting"] = input("  Lighting (e.g. natural, LED strip, enclosure): ").strip() or "unknown"
+    metadata["enclosure"] = input("  Enclosure? (yes/no): ").strip().lower()
+    if metadata["enclosure"] not in ("yes", "no"):
+        metadata["enclosure"] = "unknown"
+
+    # --- Step 4: Create bundle ---
+    print(f"\n=== Step 4/4: Creating contribution bundle ===\n")
+
+    bundle_dir = create_bundle(work_dir, review_items, labels, metadata, video_path)
+
+    output_dir = Path(args.output) if args.output else Path(".")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    zip_path = zip_bundle(bundle_dir)
+    final_zip = output_dir / zip_path.name
+    if final_zip != zip_path:
+        import shutil
+        shutil.move(str(zip_path), str(final_zip))
+
+    print(f"  Bundle saved to: {final_zip}")
+    print(f"  Bundle size: {final_zip.stat().st_size / 1024:.0f} KB")
+
+    # --- Upload ---
+    if not args.no_upload:
+        _auto_upload_bundle(final_zip, metadata)
+    else:
+        print(f"\n  Upload skipped (--no-upload). Bundle is ready at: {final_zip}")
+        print(f"  Thank you for helping improve Dont-Blink!\n")
+
+    return 0
+
+
+GITHUB_REPO = "smoothyy3/Dont-Blink"
+
+
+def _auto_upload_bundle(zip_path: Path, metadata: dict):
+    """Try auto-upload via gh CLI, fall back to opening a pre-filled GitHub issue."""
+    import shutil
+    import subprocess
+    import webbrowser
+    from urllib.parse import quote
+
+    printer = metadata.get("printer_model", "unknown")
+    size_kb = zip_path.stat().st_size / 1024
+
+    gh_path = shutil.which("gh")
+    if gh_path:
+        print("\n  GitHub CLI detected — attempting automatic upload...")
+        title = f"[data] Contribution: {printer} ({size_kb:.0f} KB)"
+        body = (
+            f"**Printer:** {printer}\n"
+            f"**Camera mount:** {metadata.get('camera_mount', 'unknown')}\n"
+            f"**Lighting:** {metadata.get('lighting', 'unknown')}\n"
+            f"**Enclosure:** {metadata.get('enclosure', 'unknown')}\n\n"
+            f"Bundle attached below ({size_kb:.0f} KB).\n"
+            f"Generated by `dontblink contribute`."
+        )
+        try:
+            result = subprocess.run(
+                [
+                    gh_path, "issue", "create",
+                    "--repo", GITHUB_REPO,
+                    "--title", title,
+                    "--body", body,
+                    "--label", "data-contribution",
+                ],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode == 0:
+                issue_url = result.stdout.strip()
+                print(f"  Issue created: {issue_url}")
+                print(f"\n  Please attach the bundle file to the issue:")
+                print(f"    {zip_path}")
+                webbrowser.open(issue_url)
+                print(f"\n  Thank you for helping improve Dont-Blink!\n")
+                return
+            else:
+                logger.debug(f"gh issue create failed: {result.stderr}")
+                print("  Auto-upload failed (not logged in?). Opening browser instead...")
+        except Exception as e:
+            logger.debug(f"gh CLI failed: {e}")
+            print("  Auto-upload failed. Opening browser instead...")
+
+    # Fallback: open pre-filled GitHub issue in browser
+    title = quote(f"[data] Contribution: {printer}")
+    body_lines = [
+        f"**Printer:** {printer}",
+        f"**Camera mount:** {metadata.get('camera_mount', 'unknown')}",
+        f"**Lighting:** {metadata.get('lighting', 'unknown')}",
+        f"**Enclosure:** {metadata.get('enclosure', 'unknown')}",
+        "",
+        f"Bundle: `{zip_path.name}` ({size_kb:.0f} KB)",
+        "",
+        "**Please drag-and-drop the bundle .zip file into this text area, then click Submit.**",
+        "",
+        f"> File location: `{zip_path}`",
+    ]
+    body = quote("\n".join(body_lines))
+    url = f"https://github.com/{GITHUB_REPO}/issues/new?title={title}&body={body}&labels=data-contribution"
+
+    print(f"\n  Opening GitHub in your browser to submit the contribution...")
+    print(f"  Just drag-and-drop the .zip file into the issue and click Submit.")
+    print(f"\n  Bundle location: {zip_path}")
+    webbrowser.open(url)
+    print(f"\n  Thank you for helping improve Dont-Blink!\n")
+
+
 def _add_video_process_args(parser):
     """Add shared arguments for video processing commands."""
     parser.add_argument('input', help='Input video file path')
@@ -1020,6 +1219,9 @@ def _add_video_process_args(parser):
                         help='Output folder for frames (optional: uses organized structure if not specified)')
     parser.add_argument('--rotation', type=int, default=None, choices=[0, 90, 180, 270],
                         help='Override video rotation (degrees: 0, 90, 180, 270)')
+    parser.add_argument('--capture-mode', type=str, default=None,
+                        choices=['left-park', 'right-park', 'top-park', 'out-of-view'],
+                        help='Where the printhead parks (default: left-park)')
     parser.add_argument('--print-config', action='store_true',
                         help='Print resolved configuration and exit')
 
@@ -1060,6 +1262,10 @@ Examples:
 
   # Benchmark model inference performance
   dontblink benchmark --device cpu --iterations 100
+
+  # Contribute labeled data to improve the model
+  dontblink contribute print_video.mp4
+  dontblink contribute print_video.mp4 --frames 30 --output bundles/
 
   # System diagnostics (paste into bug reports)
   dontblink doctor
@@ -1139,6 +1345,20 @@ Examples:
     parser_download.add_argument('--force', action='store_true', help='Re-download even if already cached')
     parser_download.add_argument('--list', action='store_true', help='List available models')
     
+    parser_contribute = subparsers.add_parser('contribute',
+        help='Contribute labeled frames to improve the model')
+    parser_contribute.add_argument('input', help='Input video file')
+    parser_contribute.add_argument('--output', '-o', type=str, default=None,
+        help='Output directory for the contribution bundle (default: current directory)')
+    parser_contribute.add_argument('--frames', type=int, default=20,
+        help='Number of frames to select for review (default: 20)')
+    parser_contribute.add_argument('--interval', type=float, default=2.0,
+        help='Sampling interval in seconds when scanning (default: 2.0)')
+    parser_contribute.add_argument('--min-gap', type=float, default=5.0,
+        help='Minimum time gap between selected frames in seconds (default: 5.0)')
+    parser_contribute.add_argument('--no-upload', action='store_true',
+        help='Skip automatic upload — only create the bundle locally')
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -1163,6 +1383,8 @@ Examples:
         return doctor(args)
     elif args.command == 'download-model':
         return download_model(args)
+    elif args.command == 'contribute':
+        return contribute(args)
     elif args.command == 'create-config':
         create_default_config(args.output)
         return 0

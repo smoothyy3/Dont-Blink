@@ -17,6 +17,7 @@ class Config:
             'wiggle_room': 0.012,
             'frame_skip_30fps': 7.5,
             'frame_skip_multiplier': 4,
+            'capture_mode': 'left-park',
         },
         'processing': {
             'output_format': 'jpg',
@@ -134,6 +135,11 @@ class Config:
         """Get timelapse FPS."""
         return self.get('timelapse.fps')
     
+    @property
+    def capture_mode(self) -> str:
+        """Get capture mode (left-park, right-park, top-park, out-of-view)."""
+        return self.get('detection.capture_mode', 'left-park')
+
     @property
     def timelapse_codec(self) -> str:
         """Get timelapse codec."""
