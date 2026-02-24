@@ -1,0 +1,19 @@
+include LICENSE
+include README.md
+include TRAINING.md
+include config.yaml.example
+include pyproject.toml
+
+recursive-include dontblink *.py
+
+exclude strategy.md
+exclude todo.md
+exclude requirements.txt
+exclude *.MP4 *.mp4 *.avi *.mov
+exclude .DS_Store
+
+prune data
+prune models
+prune outputs
+prune logs
+prune .vscode

@@ -1,0 +1,72 @@
+# Dont-Blink Configuration File
+# Copy this file to config.yaml and modify as needed
+
+detection:
+  # Path to model weights (auto-downloaded on first run if missing)
+  # Can be absolute path, relative to working dir, or use environment variable DONTBLINK_MODEL_PATH
+  model_path: "models/custom_best.pt"
+  
+  # Device for inference: 'auto' (defaults to best available), 'cpu', 'cuda', or 'mps'
+  device: "auto"
+  
+  # Detection confidence threshold (0.0 - 1.0)
+  confidence: 0.5
+  
+  # Position wiggle room threshold for tracking (normalized 0-1)
+  # Adjusted to 0.012 to account for model X position MAE (0.0086) with safety margin
+  # This ensures reliable capture when printhead is stationary despite model error
+  wiggle_room: 0.012
+  
+  # Frame skip for 30fps videos
+  frame_skip_30fps: 7.5
+  
+  # Frame skip multiplier for other FPS
+  frame_skip_multiplier: 4
+
+processing:
+  # Output image format
+  output_format: "jpg"
+  
+  # JPEG quality (1-100)
+  image_quality: 95
+  
+  # Maximum concurrent frames to process
+  max_concurrent_frames: 10
+  
+  # Batch size for inference (1 = no batching, 4-16 recommended for GPU)
+  # Higher batch sizes improve GPU utilization but use more memory
+  # For CPU: keep at 1, for GPU: try 4, 8, or 16 depending on GPU memory
+  batch_size: 1
+  
+  # Base directory for organized outputs (when output folder not specified)
+  # Creates structure: outputs/video_name/frames/ and outputs/video_name/timelapse.mp4
+  output_base_dir: "outputs"
+  
+  # Whether to organize outputs by video name (creates subfolder per video)
+  # If false, all outputs go directly to output_base_dir
+  organize_by_video: true
+  
+  # Video rotation override (degrees): 0, 90, 180, or 270
+  # Use this if your video frames appear rotated (e.g., portrait video stored as landscape)
+  # The system will try to auto-detect rotation from video metadata, but you can override it here
+  video_rotation: 0
+
+timelapse:
+  # Frames per second for output video
+  fps: 15
+  
+  # Video codec (fourcc)
+  codec: "mp4v"
+  
+  # FourCC code (usually same as codec)
+  fourcc: "mp4v"
+
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
+  
+  # Log file path (null for console only)
+  file: null
+  
+  # Log format string
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

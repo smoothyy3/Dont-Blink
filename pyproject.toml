@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dontblink"
+version = "2.0.0"
+description = "AI-powered timelapse system for 3D printers. Detects printhead movement and captures frames automatically."
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+requires-python = ">=3.9"
+authors = [
+    {name = "Jonas"},
+]
+keywords = ["3d-printing", "timelapse", "ai", "computer-vision", "printhead-detection"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "opencv-python>=4.8.0",
+    "numpy>=1.24.0",
+    "natsort>=8.4.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "pyyaml>=6.0",
+    "tqdm>=4.65.0",
+    "psutil>=5.9.0",
+]
+
+[project.optional-dependencies]
+train = [
+    "scikit-learn>=1.0.0",
+    "tensorboard>=2.0.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "build>=1.0.0",
+    "twine>=5.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/smoothyy3/Dont-Blink"
+Repository = "https://github.com/smoothyy3/Dont-Blink"
+Issues = "https://github.com/smoothyy3/Dont-Blink/issues"
+
+[project.scripts]
+dontblink = "dontblink.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["dontblink*"]
+exclude = ["data*", "models*", "outputs*", "logs*", "tests*"]
